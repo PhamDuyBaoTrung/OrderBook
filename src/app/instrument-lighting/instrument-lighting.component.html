@@ -1,0 +1,44 @@
+<div *ngIf="orderBook" class="order-book-container">
+  <div class="order-book-header">
+    <h5 class="title">Order Book</h5>
+    <label class="order-label">Depth</label>
+    <select class="depth-selection"
+            (change)="onChangeDepth()"
+            [(ngModel)]="depth"
+            name="depth"
+            id="depth">
+      <option value="0.5">0.5</option>
+      <option value="1">1</option>
+      <option value="2">2</option>
+      <option value="5">5</option>
+    </select>
+  </div>
+  <table class="ob-table">
+    <th class="ob-header price">Price</th>
+    <th class="ob-header quantity right">Quantity</th>
+    <th class="ob-header total right">Total</th>
+    <tr *ngFor="let sell of orderBook.sell; let i = index" class="ob-row" [ngClass]="{'even-line' : i % 2 === 0}">
+      <td class="ob-col sell-price">{{sell.price | orderValue}}</td>
+      <td class="ob-col quantity right">{{sell.quantity | orderValue}}</td>
+      <td class="ob-col total right">
+        <div class="progress-bar sell-percent"
+             [style.width.%]="calculateProgress(sell.total)"></div>
+        {{sell.total | orderValue}}
+      </td>
+    </tr>
+    <tr class="middle-line">
+      <td class="ob-col last-traded-price">{{orderBook.lastTradedPrice}}</td>
+      <td class="ob-row mark-price">{{orderBook.markPrice}}</td>
+      <td class="ob-row"></td>
+    </tr>
+    <tr *ngFor="let buy of orderBook.buy; let i = index" class="ob-row" [ngClass]="{'even-line' : i % 2 === 0}">
+      <td class="ob-col buy-price">{{buy.price | orderValue}}</td>
+      <td class="ob-col quantity right">{{buy.quantity | orderValue}}</td>
+      <td class="ob-col total right">
+        <div class="progress-bar buy-percent"
+             [style.width.%]="calculateProgress(buy.total)"></div>
+        {{buy.total | orderValue}}
+      </td>
+    </tr>
+  </table>
+</div>

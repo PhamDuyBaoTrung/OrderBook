@@ -1,0 +1,120 @@
+.order-book-container {
+  max-width: 500px;
+  margin: 50px auto;
+  padding: 5px;
+  background-color: var(--background-color);
+  color: white;
+  .order-book-header {
+    display: flex;
+    flex-direction: row;
+    justify-content: flex-start;
+    border: 1px solid var(--border-color);
+    .title {
+      flex: 1;
+      font-weight: 700;
+      font-size: 16px;
+      padding-left: 15px;
+    }
+    .order-label {
+      margin: auto 5px;
+    }
+    .depth-selection {
+      width: 50px;
+      color: white;
+      background-color: var(--background-color);
+      border: none;
+      outline: none;
+    }
+  }
+  .ob-table {
+    width: 100%;
+    border-spacing: 0;
+    padding-right: 5px;
+    border: 1px solid var(--border-color);
+    .ob-header {
+      width: 33%;
+      padding: 5px 0;
+      color: var(--header-color);
+      &.right {
+        text-align: right;
+        padding-right: 20px;
+      }
+      &.price {
+        width: 40%;
+      }
+      &.quantity {
+        width: 25%;
+      }
+      &.total {
+        width: 35%;
+      }
+    }
+    .ob-row {
+      &.even-line {
+        background-color: var(--lighten-bg-color);
+        .progress-bar {
+          &.sell-percent {
+            background-color: var(--light-red-color-2);
+          }
+          &.buy-percent {
+            background-color: var(--light-green-color-2);
+          }
+        }
+      }
+      .ob-col {
+        position: relative;
+        text-align: center;
+        padding: 5px 0;
+        &.sell-price {
+          width: 40%;
+          color: var(--red-color);
+        }
+        &.buy-price {
+          width: 40%;
+          color: var(--green-color);
+        }
+        &.total {
+          width: 35%;
+        }
+        &.quantity {
+          width: 25%;
+        }
+        &.right {
+          text-align: right;
+          padding-right: 20px;
+        }
+      }
+    }
+    .middle-line {
+      height: 40px;
+      background-color: var(--middle-line-bg-color);
+      .last-traded-price {
+        width: 40%;
+        text-align: center;
+        &.up {
+          color: var(--green-color);
+        }
+        &.down {
+          color: var(--red-color);
+        }
+      }
+      .mark-price {
+        width: 25%;
+        text-align: right;
+        padding-right: 20px;
+      }
+    }
+  }
+  .progress-bar {
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    &.sell-percent {
+      background-color: var(--light-red-color-1);
+    }
+    &.buy-percent {
+      background-color: var(--light-green-color-1);
+    }
+  }
+}
