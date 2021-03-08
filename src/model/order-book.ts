@@ -4,6 +4,7 @@ export class OrderBook {
   lastTradedPrice: number;
   markPrice: number;
   totalQuantity: number;
+  lastPriceStatus: PriceStatus;
 }
 
 export class OrderBookItem {
@@ -14,4 +15,9 @@ export class OrderBookItem {
     this.price = price;
     this.quantity = quantity;
   }
+}
+
+export enum PriceStatus {
+  UP = 1,
+  DOWN = 2
 }

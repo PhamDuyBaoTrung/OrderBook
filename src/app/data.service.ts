@@ -3,7 +3,7 @@ import {webSocket} from 'rxjs/webSocket';
 import {EMPTY, Observable, Subject, timer} from 'rxjs';
 import {catchError, delayWhen, retryWhen, switchAll, tap} from 'rxjs/operators';
 import pako from 'pako';
-import {OrderBook, OrderBookItem} from '../model/order-book';
+import {OrderBook, OrderBookItem, PriceStatus} from '../model/order-book';
 import {OkexResponse, OkexTable, WsConnectionStatus} from '../model/okex-response';
 import {throttleTime} from 'rxjs/internal/operators';
 import {AppSetting} from './utils/app-setting';
@@ -21,13 +21,13 @@ export class DataService {
   private wsConnectionSuject$ = new Subject<WsConnectionStatus>();
   private pingInterval;
   private numOfRetry = 0;
-  public messages$ = this.messagesSubject$.pipe(throttleTime(2000), switchAll(), catchError(e => { throw e; }));
+  public messages$ = this.messagesSubject$.pipe(throttleTime(500), switchAll(), catchError(e => { throw e; }));
 
   public connect(cfg: { reconnect: boolean } = { reconnect: false }): void {
     if (!this.socket$ || this.socket$.closed) {
       this.socket$ = this.getNewWebSocket();
       const messages = this.socket$.pipe(cfg.reconnect ? this.reconnect.bind(this) : o => o,
-        throttleTime(2000),
+        throttleTime(500),
         tap({
           error: error => console.log(error),
         }), catchError(_ => EMPTY));
@@ -158,8 +158,13 @@ export class DataService {
       return this.orderBook;
     }
     const lastTradedPrice = Number(rawData.last);
+    this.orderBook.lastPriceStatus = lastTradedPrice > this.orderBook.lastTradedPrice ? PriceStatus.UP : PriceStatus.DOWN;
     this.orderBook.lastTradedPrice = this.roundedPrice(lastTradedPrice, this.depth);
     return this.orderBook;
+  }
+
+  public testData(data) {
+    return this.normalizeOrderData(data);
   }
 
   /**
@@ -172,23 +177,25 @@ export class DataService {
     let sellPrices = asks.map(o => new OrderBookItem(Number(o[0]), Number(o[1])));
     let buyPrices = bids.map(o => new OrderBookItem(Number(o[0]), Number(o[1])));
     if (sellPrices.length > 0) {
-      const roundedMinSellPrice = this.roundedPrice(sellPrices[0].price, this.depth);
-      const groupedSellPrices = this.aggregateOrderByDepth(sellPrices, this.depth, roundedMinSellPrice);
-      const mergedSellPrices = this.mergeOrderLists(this.orderBook.sell, groupedSellPrices);
-      mergedSellPrices.sort((p1, p2) => p1.price < p2.price ? -1 : p1.price > p2.price ? 1 : 0);
-      this.calculateAccumulate(mergedSellPrices);
-      sellPrices = mergedSellPrices;
+      const ascCompareFn = (p1, p2) => p1.price < p2.price ? -1 : p1.price > p2.price ? 1 : 0;
+      const minSellPrice = this.roundedPrice(sellPrices[0].price, this.depth);
+      const combinedSellPrices = this.mergeOrderLists(this.orderBook.sell, sellPrices, ascCompareFn);
+      const aggregatedSellPrices = this.aggregateSellOrderByDepth(combinedSellPrices, this.depth, minSellPrice);
+      aggregatedSellPrices.sort(ascCompareFn);
+      this.calculateAccumulate(aggregatedSellPrices);
+      sellPrices = aggregatedSellPrices;
     } else {
       sellPrices = (this.orderBook.sell || []).reverse();
     }
 
     if (buyPrices.length > 0) {
-      const roundedMinBuyPrice = this.roundedPrice(buyPrices[buyPrices.length - 1].price, this.depth);
-      const groupedBuyPrices = this.aggregateOrderByDepth(buyPrices, this.depth, roundedMinBuyPrice);
-      const mergedBuyPrices = this.mergeOrderLists(this.orderBook.buy, groupedBuyPrices);
-      mergedBuyPrices.sort((p1, p2) => p1.price < p2.price ? 1 : p1.price > p2.price ? -1 : 0);
-      this.calculateAccumulate(mergedBuyPrices);
-      buyPrices = mergedBuyPrices;
+      const descCompareFn = (p1, p2) => p1.price < p2.price ? 1 : p1.price > p2.price ? -1 : 0;
+      const maxBuyPrice = this.roundedPrice(buyPrices[0].price, this.depth);
+      const combinedBuyPrices = this.mergeOrderLists(this.orderBook.buy, buyPrices, descCompareFn);
+      const aggregatedBuyPrices = this.aggregateBuyOrderByDepth(combinedBuyPrices, this.depth, maxBuyPrice);
+      aggregatedBuyPrices.sort(descCompareFn);
+      this.calculateAccumulate(aggregatedBuyPrices);
+      buyPrices = aggregatedBuyPrices;
     } else {
       buyPrices = this.orderBook.buy;
     }
@@ -201,17 +208,14 @@ export class DataService {
     return this.orderBook;
   }
 
-  private mergeOrderLists(source: OrderBookItem[], dest: OrderBookItem[]) {
+  private printOutPrice(orders) {
+    orders.forEach(o => console.log(o));
+  }
+
+  private mergeOrderLists(source: OrderBookItem[], dest: OrderBookItem[], compareFn) {
     const mergedList = source || [];
-    dest.forEach(o => {
-      const existingIdx = (source || []).findIndex(s => s.price === o.price);
-      if (existingIdx >= 0) {
-        const mergedItem = new OrderBookItem(o.price, o.quantity + source[existingIdx].quantity);
-        mergedList.splice(existingIdx, 1, mergedItem);
-      } else {
-        mergedList.push(o);
-      }
-    });
+    mergedList.push(...dest);
+    mergedList.sort((o1, o2) => compareFn(o1, o2));
     return mergedList;
   }
 
@@ -232,16 +236,16 @@ export class DataService {
   }
 
   /**
-   * aggregate the order list based on a specific depth
+   * aggregate the sell order list based on a specific depth
    * @param {OrderBookItem[]} orders
    * @param {number} depth
    * @param {number} minPrice
    * @returns {OrderBookItem[]}
    */
-  private aggregateOrderByDepth(orders: OrderBookItem[], depth: number, minPrice: number) {
+  private aggregateSellOrderByDepth(orders: OrderBookItem[], depth: number, minPrice: number) {
     const groupOrder = {};
     orders.forEach((x) => {
-      const y = this.calculateGroupKey(x, depth, minPrice);
+      const y = this.groupSellKey(x, depth, minPrice);
       groupOrder[y] = (groupOrder[y] || []).concat(x);
     });
     return Object.keys(groupOrder).map((y) => {
@@ -250,9 +254,33 @@ export class DataService {
     });
   }
 
-  private calculateGroupKey(order: OrderBookItem, depth: number, minPrice: number) {
+  private groupSellKey(order: OrderBookItem, depth: number, minPrice: number) {
     const gaps = (order.price - minPrice) / depth;
     return Math.round(gaps) * depth + minPrice;
+  }
+
+  /**
+   * aggregate the buy order list based on a specific depth
+   * @param {OrderBookItem[]} orders
+   * @param {number} depth
+   * @param {number} minPrice
+   * @returns {OrderBookItem[]}
+   */
+  private aggregateBuyOrderByDepth(orders: OrderBookItem[], depth: number, minPrice: number) {
+    const groupOrder = {};
+    orders.forEach((x) => {
+      const y = this.groupBuyKey(x, depth, minPrice);
+      groupOrder[y] = (groupOrder[y] || []).concat(x);
+    });
+    return Object.keys(groupOrder).map((y) => {
+      const totalQuantity = groupOrder[y].reduce((t, v) => t + v.quantity, 0);
+      return new OrderBookItem(Number(y), totalQuantity);
+    });
+  }
+
+  private groupBuyKey(order: OrderBookItem, depth: number, maxPrice: number) {
+    const gaps = (maxPrice - order.price) / depth;
+    return maxPrice - Math.round(gaps) * depth;
   }
 
   private calculateAccumulate(orders: OrderBookItem[]) {

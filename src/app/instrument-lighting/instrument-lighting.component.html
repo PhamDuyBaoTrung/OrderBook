@@ -27,8 +27,16 @@
       </td>
     </tr>
     <tr class="middle-line">
-      <td class="ob-col last-traded-price">{{orderBook.lastTradedPrice}}</td>
-      <td class="ob-row mark-price">{{orderBook.markPrice}}</td>
+      <td class="ob-col last-traded-price"
+          [ngClass]="{'up': orderBook.lastPriceStatus === 1, 'down': orderBook.lastPriceStatus === 2}">
+        <img *ngIf="orderBook.lastPriceStatus === 1" src="/assets/images/up-arrow.png" height="10px">
+        <img *ngIf="orderBook.lastPriceStatus === 2" src="/assets/images/down-arrow.png" height="10px">
+        {{orderBook.lastTradedPrice}}
+      </td>
+      <td class="ob-row mark-price">
+        <img src="/assets/images/flag.png" height="10px">
+        {{orderBook.markPrice}}
+      </td>
       <td class="ob-row"></td>
     </tr>
     <tr *ngFor="let buy of orderBook.buy; let i = index" class="ob-row" [ngClass]="{'even-line' : i % 2 === 0}">

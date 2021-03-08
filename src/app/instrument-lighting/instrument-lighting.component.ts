@@ -23,7 +23,7 @@ export class InstrumentLightingComponent {
   }
 
   onChangeDepth() {
-    this.service.setDepth(this.depth);
+    this.service.setDepth(Number(this.depth));
   }
 
 }
