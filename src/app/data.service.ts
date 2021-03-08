@@ -163,6 +163,10 @@ export class DataService {
     return this.orderBook;
   }
 
+  /**
+   * Use to test the mock data
+   * @param data
+   */
   public testData(data) {
     return this.normalizeOrderData(data);
   }
